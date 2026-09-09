@@ -1,0 +1,191 @@
+<!doctype html><html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1769aa"><title>Cadastro de Equipamentos</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6f9;font-family:Arial,sans-serif;color:#17212b}.wrap{max-width:760px;margin:auto;padding:18px}.card{background:#fff;border-radius:16px;padding:18px;margin:14px 0;box-shadow:0 2px 10px #0001}
+h1{margin:0 0 6px;font-size:27px;color:#1769aa}h2{font-size:20px;margin:0}p{color:#5b6875}label{display:block;font-weight:700;margin:13px 0 6px}
+input,select,button{width:100%;min-height:46px;border-radius:10px;font-size:16px}input,select{border:1px solid #c8d1da;padding:10px;background:#fff}button{border:0;padding:10px;font-weight:700}
+.primary{background:#1769aa;color:#fff}.secondary{background:#e8eef4;color:#173042}.danger{background:#f5e8e8;color:#9d2727}.row,.coords,.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.status{margin-top:10px;padding:10px;border-radius:9px;background:#eef5fb;font-size:14px}.item{border-top:1px solid #e3e8ed;padding:14px 0}.item:first-child{border-top:0}.item strong{font-size:17px}.meta{font-size:13px;color:#65727e;margin:5px 0 10px}.badge{display:inline-block;padding:4px 8px;border-radius:12px;background:#e8eef4;font-size:12px;margin-top:5px}.empty{text-align:center;color:#6b7782;padding:20px 0}.offline{font-weight:700;color:#a45b00}.online{font-weight:700;color:#18733b}
+@media(max-width:450px){.row,.coords,.actions{grid-template-columns:1fr}}
+</style><style id="lista-recolhida-style">
+.nome-equipamento{display:block;width:100%;min-height:48px;text-align:left;border:0;border-radius:10px;background:transparent;padding:12px 4px;font:inherit;font-size:17px;font-weight:700;cursor:pointer}
+.nome-equipamento:hover{background:#f3f4f6}
+.nome-equipamento:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.detalhes-equipamento{padding:4px 4px 14px;line-height:1.55}
+.detalhes-equipamento>div{margin-top:6px}
+.acoes-equipamento{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+</style></head><body><div class="wrap">
+<h1>📍 Cadastro de Equipamentos</h1><p>Cadastre equipamentos e registre a localização. Os dados ficam salvos no celular mesmo sem internet.</p>
+<p id="net" class="offline">● Modo offline</p>
+<section class="card">
+<label for="name">Nome do equipamento</label><input id="name" placeholder="Ex.: Transformador 01">
+<label for="type">Tipo</label><select id="type"><option value="">Selecione o tipo</option><option>Chave Faca</option><option>Chave Fusível</option><option>Religador</option><option>Regulador de Tensão</option><option>Transformador</option><option>Medidor</option></select>
+<label for="note">Anotação</label>
+<textarea id="note" rows="4" placeholder="Digite uma observação sobre o equipamento..." style="width:100%;border:1px solid #c8d1da;border-radius:10px;padding:10px;font-size:16px;font-family:Arial,sans-serif;resize:vertical"></textarea>
+<div class="status">A data e a hora da anotação serão registradas automaticamente ao salvar.</div>
+<div class="coords"><div><label for="lat">Latitude</label><input id="lat" placeholder="Automática"></div><div><label for="lon">Longitude</label><input id="lon" placeholder="Automática"></div></div>
+<div class="row"><button type="button" class="primary" id="gps">📍 CAPTURAR GPS</button><button type="button" class="secondary" id="save">💾 SALVAR EQUIPAMENTO</button></div>
+<div id="status" class="status">Sem internet também é possível cadastrar. Pressione “Capturar GPS” no local do equipamento.</div>
+</section>
+<section class="card">
+<h2>💾 Backup dos equipamentos</h2>
+<p>Faça um backup para guardar seus cadastros fora do celular. Use “Restaurar” para recuperar depois.</p>
+<div class="row">
+<button type="button" class="secondary" id="backup">⬇️ FAZER BACKUP</button>
+<button type="button" class="secondary" id="restoreBtn">⬆️ RESTAURAR BACKUP</button>
+</div>
+<input id="restoreFile" type="file" accept=".json,application/json" style="display:none">
+<div id="backupStatus" class="status">Recomendação: faça um backup regularmente e antes de trocar de celular.</div>
+</section>
+
+<section class="card"><div class="row" style="align-items:center"><h2>Equipamentos cadastrados</h2><button type="button" class="secondary" id="export">⬇️ EXPORTAR CSV</button></div>
+<label for="search">Pesquisar por nome ou tipo</label><input id="search" placeholder="Ex.: Transformador"><div id="list"></div></section>
+</div>
+<script>
+const KEY="equipamentos_campo_offline_v3";let data=[];try{data=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){data=[]}
+const $=id=>document.getElementById(id);function persist(){try{localStorage.setItem(KEY,JSON.stringify(data));return true}catch(e){alert("Não foi possível salvar os dados.");return false}}
+function status(t){$("status").textContent=t}function updateNet(){let n=navigator.onLine;$("net").textContent=n?"● Internet disponível":"● Modo offline";$("net").className=n?"online":"offline"}
+addEventListener("online",updateNet);addEventListener("offline",updateNet);updateNet();
+$("gps").onclick=()=>{if(!navigator.geolocation){status("Este navegador não oferece GPS.");return}status("Obtendo localização pelo GPS… aguarde.");navigator.geolocation.getCurrentPosition(p=>{$("lat").value=p.coords.latitude.toFixed(7);$("lon").value=p.coords.longitude.toFixed(7);status("✅ GPS capturado. Precisão aproximada: "+Math.round(p.coords.accuracy)+" m.");},e=>{let m={1:"Permissão de localização negada. Autorize a localização do navegador.",2:"Não foi possível determinar sua posição. Tente novamente.",3:"Tempo esgotado. Tente novamente."};status("⚠️ "+(m[e.code]||"Erro ao obter GPS."));},{enableHighAccuracy:true,timeout:30000,maximumAge:0})};
+$("save").onclick=()=>{let name=$("name").value.trim(),type=$("type").value,lat=Number($("lat").value),lon=Number($("lon").value);if(!name)return alert("Informe o nome do equipamento.");if(!type)return alert("Selecione o tipo.");if(!Number.isFinite(lat)||lat<-90||lat>90||!Number.isFinite(lon)||lon<-180||lon>180)return alert("Capture uma localização GPS válida.");const note=$("note").value.trim();
+ const annotation=note?{text:note,date:new Date().toLocaleString("pt-BR")}:null;
+ data.unshift({id:Date.now(),name,type,lat,lon,date:new Date().toLocaleString("pt-BR"),annotation});if(persist()){["name","lat","lon","note"].forEach(id=>$(id).value="");$("type").value="";render();status("✅ Equipamento salvo no celular. Não precisa de internet.")}};
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function render() {
+  const q = ($("search")?.value || "").trim().toLowerCase();
+  const lista = $("list");
+  if (!lista) return;
+
+  const filtrados = data.filter(e => {
+    const texto = [
+      e.name, e.type, e.note, e.lat, e.lon, e.date,
+      e.annotation?.text, e.annotation?.date
+    ].map(v => String(v ?? "")).join(" ").toLowerCase();
+    return texto.includes(q);
+  });
+
+  if (!filtrados.length) {
+    lista.innerHTML = '<div class="empty">Nenhum equipamento cadastrado.</div>';
+    return;
+  }
+
+  lista.innerHTML = filtrados.map((e, index) => {
+    const key = String(e.id ?? index).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const detailId = "detalhe_" + key;
+
+    const note = e.annotation?.text || e.note || "";
+    const noteDate = e.annotation?.date || "";
+
+    return `
+      <div class="item">
+        <button type="button" class="nome-equipamento"
+          data-detail="${detailId}" aria-expanded="false">
+          ${esc(e.name || "Equipamento sem nome")}
+        </button>
+
+        <div id="${detailId}" class="detalhes-equipamento" hidden>
+          <div><strong>Tipo:</strong> ${esc(e.type || "-")}</div>
+          <div><strong>Latitude:</strong> ${esc(String(e.lat ?? "-"))}</div>
+          <div><strong>Longitude:</strong> ${esc(String(e.lon ?? "-"))}</div>
+          <div><strong>Cadastrado em:</strong> ${esc(e.date || "-")}</div>
+          <div>
+            <strong>Anotação:</strong>
+            ${note ? `<br>${esc(note).replace(/\n/g,"<br>")}${noteDate ? `<br><small>Registrada em: ${esc(noteDate)}</small>` : ""}` : " Nenhuma"}
+          </div>
+
+          <div class="acoes-equipamento">
+            <button type="button" class="primary btn-mapa" data-id="${esc(String(e.id))}">
+              📍 ABRIR NO GOOGLE MAPS
+            </button>
+            <button type="button" class="danger btn-excluir" data-id="${esc(String(e.id))}">
+              🗑️ EXCLUIR
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  lista.querySelectorAll(".nome-equipamento").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const box = $(btn.dataset.detail);
+      if (!box) return;
+      const abrir = box.hidden;
+      box.hidden = !abrir;
+      btn.setAttribute("aria-expanded", String(abrir));
+    });
+  });
+
+  lista.querySelectorAll(".btn-mapa").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const e = data.find(x => String(x.id) === String(btn.dataset.id));
+      if (!e) return;
+      if (!navigator.onLine) {
+        alert("Sem internet. O Google Maps precisa de internet para abrir.");
+        return;
+      }
+      const lat = Number(e.lat), lon = Number(e.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        alert("Coordenadas inválidas.");
+        return;
+      }
+      window.open(
+        "https://www.google.com/maps/search/?api=1&query=" +
+        encodeURIComponent(lat + "," + lon),
+        "_blank"
+      );
+    });
+  });
+
+  lista.querySelectorAll(".btn-excluir").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const e = data.find(x => String(x.id) === String(btn.dataset.id));
+      if (!e) return;
+      if (!confirm(`Excluir o equipamento "${e.name || "sem nome"}"?`)) return;
+      data = data.filter(x => String(x.id) !== String(btn.dataset.id));
+      persist();
+      render();
+    });
+  });
+}
+$("search").oninput=render;$("export").onclick=()=>{if(!data.length)return alert("Não há equipamentos cadastrados.");let rows=[["Nome","Tipo","Latitude","Longitude","Data do cadastro","Anotação","Data/hora da anotação"],...data.map(e=>[e.name,e.type,e.lat,e.lon,e.date,e.annotation?e.annotation.text:"",e.annotation?e.annotation.date:""])],csv="\uFEFF"+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(";")).join("\r\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="equipamentos.csv";a.click()};render();
+
+$("backup").addEventListener("click",()=>{
+ if(!data.length){alert("Não há equipamentos cadastrados para fazer backup.");return}
+ const backup={app:"Cadastro de Equipamentos",version:1,createdAt:new Date().toISOString(),equipamentos:data};
+ const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+ const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+ const d=new Date(), stamp=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+ a.download="backup_equipamentos_"+stamp+".json";a.click();
+ $("backupStatus").textContent="✅ Backup criado. Guarde esse arquivo em um local seguro.";
+});
+
+$("restoreBtn").addEventListener("click",()=>$("restoreFile").click());
+
+$("restoreFile").addEventListener("change",e=>{
+ const file=e.target.files[0]; if(!file)return;
+ const reader=new FileReader();
+ reader.onload=()=>{
+  try{
+   const obj=JSON.parse(reader.result);
+   const incoming=Array.isArray(obj)?obj:obj.equipamentos;
+   if(!Array.isArray(incoming))throw new Error();
+   const valid=incoming.filter(x=>x && typeof x.name==="string" && typeof x.type==="string" &&
+     Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lon)) &&
+     Number(x.lat)>=-90 && Number(x.lat)<=90 && Number(x.lon)>=-180 && Number(x.lon)<=180)
+     .map(x=>({id:Number(x.id)||Date.now()+Math.random(),name:x.name,type:x.type,lat:Number(x.lat),lon:Number(x.lon),date:x.date||"",annotation:x.annotation&&typeof x.annotation.text==="string"?{text:x.annotation.text,date:x.annotation.date||""}:null}));
+   if(!valid.length)throw new Error();
+   const replace=confirm("OK = substituir a lista atual pelo backup.\nCancelar = adicionar o backup aos equipamentos atuais.");
+   if(replace)data=valid;
+   else{
+    const ids=new Set(data.map(x=>String(x.id)));
+    valid.forEach(x=>{if(!ids.has(String(x.id)))data.push(x);});
+   }
+   if(persist()){render();$("backupStatus").textContent="✅ Backup restaurado com sucesso. "+data.length+" equipamento(s) na lista.";}
+  }catch(err){alert("Não foi possível restaurar este arquivo. Selecione um backup criado por este aplicativo.");}
+  e.target.value="";
+ };
+ reader.readAsText(file);
+});
+</script></body></html>
