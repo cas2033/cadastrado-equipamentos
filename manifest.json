@@ -1,0 +1,10 @@
+{
+  "name": "Cadastro de Equipamentos",
+  "short_name": "Equipamentos",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f6f9",
+  "theme_color": "#1769aa",
+  "description": "Cadastro de equipamentos com localização e armazenamento local."
+}
